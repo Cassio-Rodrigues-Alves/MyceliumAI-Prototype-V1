@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyceliumAI - Analisador de Sentimentos</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* O mesmo estilo incrível do projeto anterior */
+        :root {
+            --bg-color: #121212;
+            --primary-color: #bb86fc;
+            --secondary-color: #03dac6;
+            --surface-color: #1e1e1e;
+            --text-color: #e0e0e0;
+            --subtle-text-color: #a0a0a0;
+        }
+        body {
+            font-family: 'Space Grotesk', sans-serif; display: flex; justify-content: center;
+            align-items: center; min-height: 100vh; margin: 0; background-color: var(--bg-color);
+            color: var(--text-color); overflow: hidden;
+        }
+        body::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-image: 
+                linear-gradient(to right, rgba(3, 218, 198, 0.1) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(3, 218, 198, 0.1) 1px, transparent 1px);
+            background-size: 40px 40px; animation: pan-grid 20s linear infinite; z-index: -1;
+        }
+        @keyframes pan-grid { from { background-position: 0 0; } to { background-position: 40px 40px; } }
+        .container {
+            text-align: center; padding: 2.5em 3em; background-color: var(--surface-color);
+            border-radius: 12px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(5px);
+            max-width: 500px; width: 90%; z-index: 1;
+        }
+        h1 { font-family: 'Roboto Mono', monospace; color: var(--primary-color); margin-bottom: 0.5em; }
+        p { color: var(--subtle-text-color); margin-bottom: 2em; }
+        textarea {
+            font-family: 'Roboto Mono', monospace; font-size: 1.1em; padding: 0.8em;
+            background-color: rgba(0,0,0,0.3); border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px; color: var(--text-color); width: 100%;
+            box-sizing: border-box; min-height: 100px; margin-bottom: 1em; resize: vertical;
+        }
+        textarea:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 15px rgba(187, 134, 252, 0.3); }
+        button {
+            font-family: 'Space Grotesk', sans-serif; font-size: 1.2em; padding: 0.8em 1.5em;
+            cursor: pointer; background-color: var(--primary-color); color: #000;
+            border: none; border-radius: 8px; font-weight: bold; width: 100%;
+            transition: transform 0.2s, background-color 0.3s;
+        }
+        button:hover:not(:disabled) { transform: translateY(-3px); background-color: var(--secondary-color); }
+        button:disabled { background-color: #333; color: #777; cursor: not-allowed; }
+        #status { margin-top: 1.5em; min-height: 2em; }
+        #resultado { font-size: 1.8em; font-weight: bold; color: var(--secondary-color); text-transform: capitalize; }
+        .loader {
+            border: 4px solid var(--subtle-text-color); border-top: 4px solid var(--primary-color);
+            border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite;
+            display: inline-block; vertical-align: middle;
+        }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MyceliumAI</h1>
+        <p>Analisador de Sentimentos</p>
+        
+        <textarea id="fraseInput" placeholder="Digite uma frase aqui..."></textarea>
+        <button id="preverBotao" disabled>Aguarde...</button>
+
+        <div id="status">
+            <!-- O resultado ou o spinner aparecerão aqui -->
+        </div>
+    </div>
+
+    <!-- 1. Carrega a biblioteca TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    
+    <!-- 2. DEFINE NOSSAS CLASSES CUSTOMIZADAS (Caminho e No) -->
+    <script>
+        class Caminho extends tf.layers.Layer {
+            constructor(config) { super(config); this.nome = config.nome; this.origem = config.origem; this.destino = config.destino; }
+            build(inputShape) {
+                const featureDim = inputShape[inputShape.length - 1];
+                this.kernel = this.addWeight(`peso_${this.name}`, [featureDim], 'float32');
+                this.bias = this.addWeight(`bias_${this.name}`, [featureDim], 'float32');
+                super.build(inputShape);
+            }
+            call(inputs) { return tf.tidy(() => tf.add(tf.mul(Array.isArray(inputs) ? inputs[0] : inputs, this.kernel.read()), this.bias.read())); }
+            getConfig() { return Object.assign(super.getConfig(), { nome: this.nome, origem: this.origem, destino: this.destino }); }
+            static get className() { return 'Caminho'; }
+        }
+
+        class No extends tf.layers.Layer {
+            constructor(config) {
+                super(config);
+                this.camadaInterna = tf.layers.dense(config.camadaInternaConfig);
+                this.camadaAtivacaoFinal = tf.layers.activation(config.camadaAtivacaoConfig);
+            }
+            call(inputs) {
+                return tf.tidy(() => {
+                    const tensorAgregado = inputs.length === 1 ? inputs[0] : tf.layers.add().apply(inputs);
+                    const modificado = this.camadaInterna.apply(tensorAgregado);
+                    return this.camadaAtivacaoFinal.apply(modificado);
+                });
+            }
+            static get className() { return 'No'; }
+        }
+    </script>
+    
+    <!-- 3. SCRIPT PRINCIPAL DE PREVISÃO -->
+    <script>
+        // REGISTRA as classes customizadas para que o TensorFlow saiba como carregá-las
+        tf.serialization.registerClass(Caminho);
+        tf.serialization.registerClass(No);
+
+        // Função principal que roda quando a página carrega
+        window.onload = async () => {
+            const fraseInput = document.getElementById('fraseInput');
+            const preverBotao = document.getElementById('preverBotao');
+            const statusDiv = document.getElementById('status');
+            
+            statusDiv.innerHTML = '<div class="loader"></div> <span style="vertical-align: middle; margin-left: 0.5em;">Carregando modelo e vocabulário...</span>';
+
+            let model, vocabularioArray, wordIndex, sentimentosArray;
+
+            try {
+                // --- CARREGAMENTO EM PARALELO ---
+                const [modelPromise, vocabPromise] = [
+                    tf.loadLayersModel('./modelo_sentimentos_salvo/model.json'),
+                    fetch('./modelo_sentimentos_salvo/vocab.json').then(res => res.json())
+                ];
+                
+                model = await modelPromise;
+                vocabularioArray = await vocabPromise;
+                
+                // --- PREPARAÇÃO DAS FERRAMENTAS ---
+                wordIndex = vocabularioArray.reduce((map, palavra, i) => ({...map, [palavra]: i}), {});
+                sentimentosArray = ["alegria", "tristeza", "raiva", "medo", "surpresa", "ansiedade", "vergonha", "amor", "empolgação"];
+                const vocabSize = vocabularioArray.length;
+
+                console.log('Modelo e vocabulário carregados com sucesso!');
+                statusDiv.innerHTML = '<div id="resultado">Pronto para analisar!</div>';
+                preverBotao.disabled = false;
+                preverBotao.innerText = 'Analisar Sentimento';
+
+                // --- FUNÇÕES DE PROCESSAMENTO E PREVISÃO ---
+                function preprocessTexto(texto) {
+                    return texto.toLowerCase().replace(/[.,!?:;()"']/g, '');
+                }
+
+                function vetorizarFrase(frase) {
+                    const vetor = new Array(vocabSize).fill(0);
+                    const palavras = preprocessTexto(frase).split(/\s+/);
+                    palavras.forEach(palavra => {
+                        if (palavra in wordIndex) vetor[wordIndex[palavra]] = 1;
+                    });
+                    return vetor;
+                }
+
+                function analisarSentimento() {
+                    const frase = fraseInput.value;
+                    if (!frase.trim()) {
+                        statusDiv.innerHTML = '<div id="resultado" style="color: #cf6679;">Digite uma frase.</div>';
+                        return;
+                    }
+
+                    const resultado = tf.tidy(() => {
+                        const vetor = vetorizarFrase(frase);
+                        const tensor = tf.tensor2d([vetor]);
+                        const predicao = model.predict(tensor);
+                        const indice = predicao.argMax(1).dataSync()[0];
+                        return sentimentosArray[indice];
+                    });
+
+                    statusDiv.innerHTML = `<div id="resultado">Sentimento: <strong>${resultado}</strong></div>`;
+                }
+
+                preverBotao.onclick = analisarSentimento;
+
+            } catch (error) {
+                console.error("Erro fatal:", error);
+                statusDiv.innerHTML = `<div id="resultado" style="color: #cf6679;">Falha ao carregar. Verifique o console (F12).</div>`;
+            }
+        };
+    </script>
+</body>
+</html>
