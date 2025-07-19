@@ -107,3 +107,4 @@ A MyceliumAI é uma plataforma para experimentação. Os próximos passos para e
 ### Licença
 
 Este projeto está sob a **Licença MIT**. Sinta-se à vontade para usar, aprender e construir sobre ele.
+ 
