@@ -14,7 +14,7 @@
 
 
 
-Opa! Eu sou Cássio, um desenvolvedor brasileiro de 16 anos apaixonado por Inteligência Artificial. Este repositório documenta a minha jornada na criação de uma arquitetura de rede neural customizada, a **MyceliumAI**.
+Opa! Eu sou Cássio, um desenvolvedor brasileiro de 17 anos apaixonado por Inteligência Artificial. Este repositório documenta a minha jornada na criação de uma arquitetura de rede neural customizada, a **MyceliumAI**.
 
 
 
