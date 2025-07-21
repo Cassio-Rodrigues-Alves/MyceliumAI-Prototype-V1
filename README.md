@@ -126,7 +126,7 @@ O script carregará o modelo e permitirá que você digite frases para ver a IA 
 
 
 
-- **Autor: ** Cássio Rodrigues Alves
+- **Autor:** Cássio Rodrigues Alves
 
 - **GitHub:** `https://github.com/Cassio-Rodrigues-Alves`
 
